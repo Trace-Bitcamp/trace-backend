@@ -3,6 +3,9 @@ from flask_cors import CORS
 import os
 from supabase import create_client, Client
 import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
