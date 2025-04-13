@@ -17,7 +17,7 @@ model = PD_Model()
 load_dotenv()
 
 
-port = 10000
+# port = 10000
 
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
@@ -28,13 +28,14 @@ client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 app = Flask(__name__)
 # Configure CORS to allow all origins and methods
-CORS(app, resources={r"/*": {
-    "origins": ["http://localhost:3000", "http://localhost:5173", "*"],  # Add your frontend URL
-    "methods": ["GET", "POST", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization", "Accept"],
-    "expose_headers": ["Content-Range", "X-Content-Range"],
-    "supports_credentials": True
-}})
+# CORS(app, resources={r"/*": {
+#     "origins": ["http://localhost:3000", "*"],  # Add your frontend URL
+#     "methods": ["GET", "POST", "OPTIONS"],
+#     "allow_headers": ["Content-Type", "Authorization", "Accept"],
+#     "expose_headers": ["Content-Range", "X-Content-Range"],
+#     "supports_credentials": True
+# }})
+CORS(app)
 
 @app.after_request
 def after_request(response):
@@ -202,7 +203,6 @@ def add_patient():
             "severity": severity,
             "medHist": medHist,
             "medication": [medication],
-            "assessment_ids": assessment_ids,
             "notes": []
         }
         
@@ -433,4 +433,4 @@ def gemini_report(patient_id):
 
 
 if __name__ == '__main__':
-    app.run(port=port)
+    app.run(debug=True)
