@@ -343,11 +343,6 @@ def submit_images():
 
 @app.route('/gemini_report/<patient_id>', methods=["GET"])
 def gemini_report(patient_id):
-    data = request.get_json()
-
-    if not data or 'id' not in data:
-        return jsonify({"success": False, "error": "Invalid request"}), 400
-
     try:
         patient_info = supabase.table("patients").select("*").eq('id', patient_id).execute()
         assessment_info = supabase.table("assessments").select("*").eq('patientId', 7).execute()
