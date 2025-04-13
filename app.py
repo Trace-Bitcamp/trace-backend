@@ -350,7 +350,6 @@ def gemini_report(patient_id):
         if not patient_info.data or not assessment_info.data:
             return jsonify({"success": False, "error": "Patient/Assessment not found"}), 404
         
-        app.logger.info(response.data)
         
     except Exception as e:
         app.logger.error(f"error fetching patient data: {str(e)}")
@@ -430,4 +429,4 @@ def gemini_report(patient_id):
     return jsonify({"success": True, "response": response.text[12:len(response.text)-4]}), 201
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
