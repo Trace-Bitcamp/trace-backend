@@ -77,6 +77,24 @@ def get_patient(patient_id):
         app.logger.error(f"error fetching patient data: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
     
+@app.route('/patient/<patient_id>', methods=["POST"])
+def update_patient(patient_id):
+    request_data = request.get_json(silent=True)
+    if not request_data:
+        return jsonify({"success": False, "error": "No data provided"}), 400
+    new_severity = request_data.get("severity")
+    try:
+        response = supabase.table("patients").update({"severity": new_severity}).eq("id", patient_id).execute()
+
+        if not response.data:
+            return jsonify({"success": False, "error": "Patient not found"}), 404
+        
+        return jsonify({"success": True, "data": response.data}), 200
+
+    except Exception as e:
+        app.logger.error(f"error updating patient data: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
 @app.route('/assessments')
 def get_all_assessments():
     try:
