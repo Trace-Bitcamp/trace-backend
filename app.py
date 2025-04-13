@@ -168,19 +168,27 @@ def add_patient():
         app.logger.exception("Full traceback:")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/add_assessment', methods=["POST"])
+@app.route('/add-assessment', methods=["POST"])
 def add_assessment():
-    date = request.args.get("date")
-    assessment_type = request.args.get("type")
-    path = request.args.get("path")
-    baseline_path = request.args.get("baselinePath")
+    request_data = request.get_json(silent=True)
+
+    date = request_data.get("date")
+    assessment_type = request_data.get("type")
+    patient_id = request_data.get("patientId")
+    severity = request_data.get("severity")
+    tremor = request_data.get("tremor")
+    deviation = request_data.get("deviation")
+
+    print("Received data:", date, assessment_type, patient_id, severity, tremor, deviation)
 
     try:
         data = {
             "date": date,
             "type": assessment_type,
-            "path": path,
-            "baselinePath": baseline_path
+            "patientId": int(patient_id),
+            "severity": float(severity),
+            "tremor": float(tremor),
+            "deviation": float(deviation),
         }
         
         response = supabase.table("assessments").insert(data).execute()
@@ -255,8 +263,8 @@ def add_note():
         return jsonify({"success": False, "error": str(e)}), 500
     
 
-@app.route('/submit-assessment', methods=["POST"])
-def submit_assessment():
+@app.route('/submit-images', methods=["POST"])
+def submit_images():
     data = request.get_json()
 
     if not data or 'trace' not in data or 'template' not in data or 'age' not in data:
