@@ -6,6 +6,11 @@ import datetime
 from dotenv import load_dotenv
 import base64
 from model.inference import PD_Model
+import numpy as np
+import cv2
+import base64
+from io import BytesIO
+from PIL import Image
 
 load_dotenv()
 
@@ -240,39 +245,31 @@ def add_note():
         return jsonify({"success": False, "error": str(e)}), 500
     
 
-UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
 @app.route('/submit-assessment', methods=["POST"])
 def submit_assessment():
     data = request.get_json()
 
-    if not data or 'image' not in data or 'name' not in data:
-        return jsonify({"success": False, "error": "Invalid data"}), 400
+    if not data or 'trace' not in data or 'template' not in data or 'age' not in data:
+        return jsonify({"success": False, "error": "Invalid request"}), 400
 
     trace_image = data['trace']
     template_image = data['template']
     age = data['age']
 
     # Remove the prefix (data:image/png;base64,) if it exists
-    for image in [trace_image, template_image]:
-        if image.startswith('data:image/png;base64,'):
-            image = image.replace('data:image/png;base64,', '')
-    
-    # Decode the base64 strings
-    try:
-        trace_image = base64.b64decode(trace_image)
-        template_image = base64.b64decode(template_image)
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-    
-    try:
-        pd_prob = model.run_inference(trace_image, template_image, age)
-    except Exception as e:
-        return jsonify({"success": False, "error": "Error running model inference: str(e)"}), 500
+    if trace_image.startswith('data:image/png;base64,'):
+        trace_image = trace_image.replace('data:image/png;base64,', '')
+    if template_image.startswith('data:image/png;base64,'):
+        template_image = template_image.replace('data:image/png;base64,', '')
 
-    return jsonify({"success": True, "prob": pd_prob}), 201
+    try:
+        pd_prob = model.run_inference(trace_image, template_image, age)[0]
+        print("pd_prob", pd_prob)
+    except Exception as e:
+        print(str(e))
+        return jsonify({"success": False, "error": "Error running model inference:" +  str(e)}), 500
+    
+    return jsonify({"success": True, "prob": str(pd_prob)}), 201
 
 
 if __name__ == '__main__':

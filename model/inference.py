@@ -2,7 +2,7 @@ import xgboost as xgb
 import numpy as np
 import sys
 import pandas as pd
-from extract_features import get_features
+from model.extract_features import get_features
 import base64
 import cv2
 
@@ -21,16 +21,17 @@ class PD_Model:
         # 'AGE', 'RMS', 'MAX_BETWEEN_ET_HT', 'MIN_BETWEEN_ET_HT', 'STD_DEVIATION_ET_HT', 'MRT', 
         # 'MAX_HT', 'MIN_HT', 'STD_HT', 'CHANGES_FROM_NEGATIVE_TO_POSITIVE_BETWEEN_ET_HT'
 
-        importance = model.get_score(importance_type='gain')
+        # importance = model.get_score(importance_type='gain')
 
-        print("Feature importance:", sorted(importance.items(), key=lambda item: item[1], reverse=True))
+        # print("Feature importance:", sorted(importance.items(), key=lambda item: item[1], reverse=True))
 
         return model
 
     def run_inference(self, traced, template, age):
-        ft_df = pd.DataFrame(get_features(traced, template), index=[0])
+        print("Running inference...")
 
-        ft_df['AGE'] = age
+        ft_df = pd.DataFrame(get_features(traced, template), index=[0])
+        ft_df.insert(0, 'AGE', age)  # Insert 'AGE' as the first column
 
         return self.model.predict(xgb.DMatrix(ft_df))
 

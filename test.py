@@ -1,0 +1,1 @@
+template = 'template_image.png'

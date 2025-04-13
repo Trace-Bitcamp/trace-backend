@@ -4,6 +4,8 @@ import math
 import sys
 from typing import List, Tuple
 import base64
+from io import BytesIO
+from PIL import Image
 
 # Constants
 DISPLACEMENT = 10
@@ -11,18 +13,18 @@ DISPLACEMENT = 10
 # Structures replacement using simple classes
 class CPoint:
     def __init__(self, x: int = 0, y: int = 0):
-        x = x
-        y = y
+        self.x = x
+        self.y = y
 
 class Vertex:
     def __init__(self, x: float = 0.0, y: float = 0.0):
-        x = x
-        y = y
+        self.x = x
+        self.y = y
 
 class RadiusAngle:
     def __init__(self, radius: float = 0.0, angle: float = 0.0):
-        radius = radius
-        angle = angle
+        self.radius = radius
+        self.angle = angle
 
 # Helper functions to get neighbors
 # P9 P2 P3
@@ -40,8 +42,25 @@ def P8(dest, r, c): return dest[r, c-1]
 def P9(dest, r, c): return dest[r-1, c-1]
 
 def get_features(traced, template):
-    img_drawn_color = cv2.imdecode(np.frombuffer(base64.b64decode(traced), dtype=np.uint8), cv2.IMREAD_COLOR)
-    img_template_color = cv2.imdecode(np.frombuffer(base64.b64decode(template), dtype=np.uint8), cv2.IMREAD_COLOR)
+    try:
+        # img_drawn_color = cv2.imdecode(np.frombuffer(base64.b64decode(traced), dtype=np.uint8), cv2.IMREAD_COLOR)
+        img_data = base64.b64decode(traced)
+        image = np.array(Image.open(BytesIO(img_data)))
+        rgb = image[:, :, :3]  # RGB channels
+        alpha = image[:, :, 3]  # Alpha channel
+        mask = alpha > 0
+        img_drawn_color = np.ones_like(rgb) * 255
+        img_drawn_color[mask] = [0, 0, 0]
+        img_drawn_color = cv2.cvtColor(img_drawn_color, cv2.COLOR_RGBA2BGR)
+
+        img_template_color = cv2.imdecode(np.frombuffer(base64.b64decode(template), dtype=np.uint8), cv2.IMREAD_COLOR)
+        img_template_color = cv2.bitwise_not(img_template_color)
+    except Exception as e:
+        print(f"Error decoding images: {e}", file=sys.stderr)
+        return None
+    
+    cv2.imwrite('drawn_image.png', img_drawn_color)
+    cv2.imwrite('template_image.png', img_template_color)
 
     # Ensure template image has same dimensions (resize if necessary, or error out)
     # For simplicity, assuming they are the same size as in C++ code
@@ -54,9 +73,13 @@ def get_features(traced, template):
     img_drawn_gray = cv2.cvtColor(img_drawn_color, cv2.COLOR_BGR2GRAY)
     img_template_gray = cv2.cvtColor(img_template_color, cv2.COLOR_BGR2GRAY)
 
+    cv2.imwrite('drawn_image.png', img_drawn_gray)
+    cv2.imwrite('template_image.png', img_template_gray)
+
     # Threshold (using same values as C++) - Binary Threshold
     _, img_drawn_thresh = cv2.threshold(img_drawn_gray, 220, 255, cv2.THRESH_BINARY)
     _, img_template_thresh = cv2.threshold(img_template_gray, 220, 255, cv2.THRESH_BINARY)
+
 
     # Apply Zhang-Suen Thinning (modifies images in-place)
     print("Thinning drawn image...", file=sys.stderr)
