@@ -341,52 +341,34 @@ def submit_images():
         }
     }), 201
 
-@app.route('/gemini_treatment', methods=["POST"])
-def gemini_treatment():
+@app.route('/gemini_report/<patient_id>', methods=["GET"])
+def gemini_report(patient_id):
     data = request.get_json()
 
-    if not data or 'date' not in data or 'description' not in data or 'provider' not in data:
+    if not data or 'id' not in data:
         return jsonify({"success": False, "error": "Invalid request"}), 400
 
-    date = data['date']
-    description = data['description']
-    provider = data['provider']
+    try:
+        patient_info = supabase.table("patients").select("*").eq('id', patient_id).execute()
+        assessment_info = supabase.table("assessments").select("*").eq('patientId', 7).execute()
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=os.environ.get("TREATMENT_PROMPT")
-    )
-
-    return jsonify({"success": True, "response": str(response)}), 201
-
-@app.route('/gemini_report', methods=["POST"])
-def gemini_report():
-    data = request.get_json()
-
-    # if not data or 'date' not in data or 'description' not in data or 'provider' not in data:
-    #     return jsonify({"success": False, "error": "Invalid request"}), 400
-
-    name = "John Doe"
-    age = 65
-    sex = "M"
-    phone_number = "+1234567890"
-    email = "john.d@gmail.com"
-    notes = [
-        {"date": "2023-10-01", "note": "Patient shows mild tremors in the right hand."},
-        {"date": "2023-09-15", "note": "Patient reports increased stiffness in the legs."},
-        {"date": "2023-08-20", "note": "Patient's gait appears slightly shuffling."},
-        {"date": "2023-07-10", "note": "Patient's medication regimen adjusted."},
-        {"date": "2023-06-05", "note": "Patient reports improved sleep quality."}]
-    treatments = [
-        {"date": "2023-10-01", "treatment": "Increased dosage of Levodopa.", "provider": "Dr. Smith"},
-        {"date": "2023-09-01", "treatment": "Physical therapy sessions started.", "provider": "Dr. Jones"},
-        {"date": "2023-08-15", "treatment": "Prescribed Amantadine for tremor control.", "provider": "Dr. Lee"},
-        {"date": "2023-07-01", "treatment": "Initial diagnosis and treatment plan established.", "provider": "Dr. Brown"}]
-    assessments = [
-        {"date": "2023-10-01", "DTW": 0.85, "model_confidence": 0.92, "mean_relative_tremor": 0.15},
-        {"date": "2023-09-01", "DTW": 0.80, "model_confidence": 0.90, "mean_relative_tremor": 0.18},
-        {"date": "2023-08-01", "DTW": 0.78, "model_confidence": 0.88, "mean_relative_tremor": 0.20},
-        {"date": "2023-07-01", "DTW": 0.75, "model_confidence": 0.85, "mean_relative_tremor": 0.22}]
+        if not patient_info.data or not assessment_info.data:
+            return jsonify({"success": False, "error": "Patient/Assessment not found"}), 404
+        
+        app.logger.info(response.data)
+        
+    except Exception as e:
+        app.logger.error(f"error fetching patient data: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+    name = patient_info.data[0]['fName'] + " " + patient_info.data[0]['lName']
+    age = patient_info.data[0]['age']
+    sex = patient_info.data[0]['gender']
+    phone_number = patient_info.data[0]['contactPhone']
+    email = patient_info.data[0]['email']
+    notes = patient_info.data[0]['notes']
+    treatments = patient_info.data[0]['medication']
+    assessments = patient_info.data[0]
 
     prompt = f"""
     Generate a markdown report summarizing a Parkinson's disease patient's medical history and assessment data in a consistent, medically helpful format. The report must include the following sections in this exact order, using the provided data:
@@ -396,7 +378,7 @@ def gemini_report():
     3. **Past Notes**: A list of all past clinical notes, each including the date and the note content.
     4. **Past Treatments**: A list of all past treatments, each including the date, the treatment details, and the treatment provider.
     5. **Assessment Trends**: An analysis of trends over time forTambém the following metrics from each assessment:
-    - Dynamic Time Warping (DTW)
+    - The Deviation from Dynamic Time Warping (DTW)
     - Model confidence of Parkinson's diagnosis
     - Mean relative tremor
     Summarize how these metrics have changed, noting any patterns or significant fluctuations, and interpret their clinical relevance.
@@ -445,14 +427,12 @@ def gemini_report():
     [Specific, data-driven advice for next steps in patient care.]
     """
 
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-
     response = client.models.generate_content(
         model="gemini-2.0-flash", 
         contents=prompt
     )
 
-    return jsonify({"success": True, "response": response.text}), 201
+    return jsonify({"success": True, "response": response.text[12:len(response.text)-4]}), 201
 
 if __name__ == '__main__':
     app.run(debug=True)
