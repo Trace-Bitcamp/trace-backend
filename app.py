@@ -4,14 +4,14 @@ import os
 from supabase import create_client, Client
 import datetime
 from dotenv import load_dotenv
-# from model.inference import PD_Model
-# import numpy as np
-# import cv2
-# import base64
-# from io import BytesIO
-# from PIL import Image
+from model.inference import PD_Model
+import numpy as np
+import cv2
+import base64
+from io import BytesIO
+from PIL import Image
 
-# model = PD_Model()
+model = PD_Model()
 
 load_dotenv()
 
@@ -251,31 +251,36 @@ def add_note():
         return jsonify({"success": False, "error": str(e)}), 500
     
 
-# @app.route('/submit-assessment', methods=["POST"])
-# def submit_assessment():
-#     data = request.get_json()
+@app.route('/submit-assessment', methods=["POST"])
+def submit_assessment():
+    data = request.get_json()
 
-#     if not data or 'trace' not in data or 'template' not in data or 'age' not in data:
-#         return jsonify({"success": False, "error": "Invalid request"}), 400
+    if not data or 'trace' not in data or 'template' not in data or 'age' not in data:
+        return jsonify({"success": False, "error": "Invalid request"}), 400
 
-#     trace_image = data['trace']
-#     template_image = data['template']
-#     age = data['age']
+    trace_image = data['trace']
+    template_image = data['template']
+    age = data['age']
 
-#     # Remove the prefix (data:image/png;base64,) if it exists
-#     if trace_image.startswith('data:image/png;base64,'):
-#         trace_image = trace_image.replace('data:image/png;base64,', '')
-#     if template_image.startswith('data:image/png;base64,'):
-#         template_image = template_image.replace('data:image/png;base64,', '')
+    # Remove the prefix (data:image/png;base64,) if it exists
+    if trace_image.startswith('data:image/png;base64,'):
+        trace_image = trace_image.replace('data:image/png;base64,', '')
+    if template_image.startswith('data:image/png;base64,'):
+        template_image = template_image.replace('data:image/png;base64,', '')
 
-#     try:
-#         pd_prob = model.run_inference(trace_image, template_image, age)[0]
-#         print("pd_prob", pd_prob)
-#     except Exception as e:
-#         print(str(e))
-#         return jsonify({"success": False, "error": "Error running model inference:" +  str(e)}), 500
+    try:
+        severity_score, mean_tremor, dtw_distance = model.run_inference(trace_image, template_image, age)
+        print("Severity Score:", severity_score, "Mean Tremor:", mean_tremor, "DTW Distance:", dtw_distance)
+    except Exception as e:
+        print(str(e))
+        return jsonify({"success": False, "error": "Error running model inference:" +  str(e)}), 500
     
-#     return jsonify({"success": True, "prob": str(pd_prob)}), 201
+    return jsonify({"success": True, "data": {
+        "severity_score": str(severity_score),
+        "mean_tremor": str(mean_tremor),
+        "dtw_distance": str(dtw_distance)
+        }
+    }), 201
 
 
 if __name__ == '__main__':

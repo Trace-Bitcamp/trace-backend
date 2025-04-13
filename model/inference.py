@@ -30,10 +30,16 @@ class PD_Model:
     def run_inference(self, traced, template, age):
         print("Running inference...")
 
-        ft_df = pd.DataFrame(get_features(traced, template), index=[0])
+        features = get_features(traced, template)
+        dtw_distance = features.pop('NORMALIZED_DTW_DISTANCE')
+        mean_tremor = features['MRT']
+
+        ft_df = pd.DataFrame(features, index=[0])
         ft_df.insert(0, 'AGE', age)  # Insert 'AGE' as the first column
 
-        return self.model.predict(xgb.DMatrix(ft_df))
+        severity_score = self.model.predict(xgb.DMatrix(ft_df))[0]
+
+        return severity_score, mean_tremor, dtw_distance
 
 
 if __name__ == "__main__":
