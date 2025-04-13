@@ -82,9 +82,9 @@ def get_features(traced, template):
 
 
     # Apply Zhang-Suen Thinning (modifies images in-place)
-    print("Thinning drawn image...", file=sys.stderr)
+    # print("Thinning drawn image...", file=sys.stderr)
     zhang_suen(img_drawn_thresh)
-    print("Thinning template image...", file=sys.stderr)
+    # print("Thinning template image...", file=sys.stderr)
     zhang_suen(img_template_thresh)
 
     # --- Find Spiral Origin ---
@@ -94,9 +94,9 @@ def get_features(traced, template):
 
     # Find origin using the template image (as in C++ code: origem(img1_, &yc, &xc))
     # The C++ code uses img1_ which is the *template* image for finding the origin
-    print(f"Finding origin near ({xc_guess}, {yc_guess})...", file=sys.stderr)
-    yc, xc = find_origen(img_template_thresh, yc_guess, xc_guess) # Pass the thinned template
-    print(f"Using origin: ({xc}, {yc})", file=sys.stderr)
+    # print(f"Finding origin near ({xc_guess}, {yc_guess})...", file=sys.stderr)
+    yc, xc = find_origin(img_template_thresh, yc_guess, xc_guess) # Pass the thinned template
+    # print(f"Using origin: ({xc}, {yc})", file=sys.stderr)
 
 
     # --- Extract Points ---
@@ -107,7 +107,7 @@ def get_features(traced, template):
     img_drawn_copy = img_drawn_thresh.copy()
     img_template_copy = img_template_thresh.copy()
 
-    print("Extracting points...", file=sys.stderr)
+    # print("Extracting points...", file=sys.stderr)
     num_turns = 3
     num_angles = 360
     for j in range(num_turns):
@@ -135,7 +135,25 @@ def get_features(traced, template):
         print("Error: Failed to extract any points from one or both spirals. Check images and origin.", file=sys.stderr)
         return None
 
-    print(f"Extracted {n_drawn} points from drawn, {n_orig} from template.", file=sys.stderr)
+    # print(f"Extracted {n_drawn} points from drawn, {n_orig} from template.", file=sys.stderr)
+
+    # visualize the extracted points using matplotlib
+    import matplotlib
+    matplotlib.use('Agg')  # Use a non-GUI backend for saving images
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.imshow(img_drawn_thresh, cmap='gray')
+    plt.scatter([p.x for p in ptosdesenhada], [p.y for p in ptosdesenhada], color='red', s=1)
+    plt.title('Extracted Points from Drawn Spiral')
+    plt.subplot(1, 2, 2)
+    plt.imshow(img_template_thresh, cmap='gray')
+    plt.scatter([p.x for p in ptosoriginal], [p.y for p in ptosoriginal], color='blue', s=1)
+    plt.title('Extracted Points from Template Spiral')
+   
+    # save the visualization to image
+    plt.savefig('extracted_points.png')
+
 
     # --- Feature Calculation ---
     radiusangle_orig: List[RadiusAngle] = []
@@ -146,14 +164,14 @@ def get_features(traced, template):
     for i in range(n_orig):
         dx = ptosoriginal[i].x - xc
         dy = ptosoriginal[i].y - yc
-        radius = math.sqrt(dx*dx + dy*dy)
-        angle = math.atan2(dy, dx) # Use atan2 for quadrant safety
+        radius = math.sqrt(dx * dx + dy * dy)
+        angle = math.atan2(dy, dx)  # Use atan2 for quadrant safety
         radiusangle_orig.append(RadiusAngle(radius, angle))
 
     for i in range(n_drawn):
         dx = ptosdesenhada[i].x - xc
         dy = ptosdesenhada[i].y - yc
-        radius = math.sqrt(dx*dx + dy*dy)
+        radius = math.sqrt(dx * dx + dy * dy)
         angle = math.atan2(dy, dx)
         radiusangle_drawn.append(RadiusAngle(radius, angle))
 
@@ -165,94 +183,80 @@ def get_features(traced, template):
     # Calculate initial difference for the first point
     if min_points > 0:
         prev_rad_diff = radiusangle_orig[0].radius - radiusangle_drawn[0].radius
-        difradial.append(RadiusAngle(abs(prev_rad_diff), 0)) # Angle not used here
+        difradial.append(RadiusAngle(abs(prev_rad_diff), 0))  # Angle not used here
 
     for i in range(1, min_points):
         dif_rad = radiusangle_orig[i].radius - radiusangle_drawn[i].radius
-        difradial.append(RadiusAngle(abs(dif_rad), 0)) # Store absolute difference
-        if dif_rad * prev_rad_diff < 0: # Check for sign change (crossing)
+        difradial.append(RadiusAngle(abs(dif_rad), 0))  # Store absolute difference
+        if dif_rad * prev_rad_diff < 0:  # Check for sign change (crossing)
             count_cross += 1
         prev_rad_diff = dif_rad
 
-    # Calculate Tremor features based on original points' radii
-    # C++ uses ptosoriginal radii for tremor calculation
-    tremor_radii = [r.radius for r in radiusangle_orig] # Get list of radii from template
-
-    mean_tremor = 0.0
-    max_tremor = 0.0
-    min_tremor = 1e10 # Initialize min to a large value
-    std_tremor = 0.0
-    count_tremor = 0
-
-    if len(tremor_radii) > DISPLACEMENT:
-        tremor_diffs = []
-        for i in range(DISPLACEMENT, len(tremor_radii)):
-            # Use absolute difference as in C++
-            dif = abs(tremor_radii[i] - tremor_radii[i-DISPLACEMENT])
-            tremor_diffs.append(dif)
-            # mean_tremor += dif # Sum for mean calculation later
-            if dif > max_tremor: max_tremor = dif
-            if dif < min_tremor: min_tremor = dif
-            # count_tremor += 1
-
-        if tremor_diffs: # Check if list is not empty
-            mean_tremor = sum(tremor_diffs) / len(tremor_diffs)
-            # Calculate standard deviation
-            variance_tremor = sum([(d - mean_tremor)**2 for d in tremor_diffs]) / len(tremor_diffs)
-            std_tremor = math.sqrt(variance_tremor)
-        else: # Handle case with insufficient points
-            mean_tremor = 0.0
-            std_tremor = 0.0
-            min_tremor = 0.0 # Reset min if no diffs calculated
-
-    else: # Handle case with insufficient points
-        mean_tremor = 0.0
-        std_tremor = 0.0
-        min_tremor = 0.0
+    # Debugging: Print the radial differences
+    print(f"Radial differences: {[dr.radius for dr in difradial]}", file=sys.stderr)
 
     # Calculate RMS and related stats from radial differences (difradial)
-    rms = 0.0
-    min_rms_val = 1e10
-    max_rms_val = 0.0
-    std_rms = 0.0
-
-    if difradial: # Check if list is not empty
-        sum_sq_diff = 0.0
-        sq_diffs = []
-        for dr in difradial:
-            sq_diff = dr.radius * dr.radius
-            sq_diffs.append(sq_diff)
-            sum_sq_diff += sq_diff
-            if sq_diff > max_rms_val: max_rms_val = sq_diff
-            if sq_diff < min_rms_val: min_rms_val = sq_diff
-
-        rms = sum_sq_diff / len(difradial) # Mean of squared differences
+    if difradial:  # Check if list is not empty
+        sum_sq_diff = sum(dr.radius ** 2 for dr in difradial)
+        rms = math.sqrt(sum_sq_diff / len(difradial))
+        max_rms_val = max(dr.radius ** 2 for dr in difradial)
+        min_rms_val = min(dr.radius ** 2 for dr in difradial)
 
         # Calculate Standard Deviation of squared differences
-        variance_rms = sum([(sd - rms)**2 for sd in sq_diffs]) / len(difradial)
+        mean_sq_diff = sum_sq_diff / len(difradial)
+        variance_rms = sum((dr.radius ** 2 - mean_sq_diff) ** 2 for dr in difradial) / len(difradial)
         std_rms = math.sqrt(variance_rms)
-    else: # Handle case with no radial differences calculated
+    else:  # Handle case with no radial differences calculated
         rms = 0.0
         std_rms = 0.0
         min_rms_val = 0.0
+        max_rms_val = 0.0
 
+    # Debugging: Print RMS and related values
+    print(f"RMS: {rms:.6f}, Max RMS: {max_rms_val:.6f}, Min RMS: {min_rms_val:.6f}", file=sys.stderr)
+
+    # Calculate the radius for tremor features
+    tremor_radii = [r.radius for r in radiusangle_orig]  # Get list of radii from original points
+
+    # Initialize tremor statistics
+    mean_tremor = 0.0
+    max_tremor = 0.0
+    min_tremor = float('inf')  # Start with a large value for min
+    std_tremor = 0.0
+    count_tremor = len(tremor_radii)
+
+    if count_tremor > 0:
+        # Calculate mean tremor
+        mean_tremor = sum(tremor_radii) / count_tremor
+
+        # Calculate max and min tremor
+        max_tremor = max(tremor_radii)
+        min_tremor = min(tremor_radii)
+
+        # Calculate standard deviation
+        variance_tremor = sum((r - mean_tremor) ** 2 for r in tremor_radii) / count_tremor
+        std_tremor = math.sqrt(variance_tremor)
+    else:
+        # Handle case with insufficient points
+        mean_tremor = 0.0
+        max_tremor = 0.0
+        min_tremor = 0.0
+        std_tremor = 0.0
 
     # Calculate Crossings Rate
-    crossings_rate = 0.0
-    # Use count_tremor for normalization if it's derived correctly, or len(tremor_diffs)
-    # C++ uses 'count' which seems tied to tremor calculation loop
-    if len(tremor_diffs) > 0:
-        crossings_rate = float(count_cross) / len(tremor_diffs)
-    else:
-        crossings_rate = 0.0 # Avoid division by zero
+    crossings_rate = float(count_cross) / len(difradial) if len(difradial) > 0 else 0.0
+
+    # Calculate the normalized DTW distance
+    normalized_dtw = dtw_distance(radiusangle_orig, radiusangle_drawn)
 
     # --- Output ---
     # Print stats to stderr
-    print(f"RMS: {rms:.6f} (+/- {std_rms:.6f}) \t "
-        f"maxSqDiff: {max_rms_val:.6f} \t minSqDiff: {min_rms_val:.6f} \t " # C++ printed max/min of sq diff
-        f"Npoints: {n_drawn}: {n_orig} \n"
-        f"MT: {mean_tremor:.6f} MaxT: {max_tremor:.6f} MinT: {min_tremor:.6f} StdT: {std_tremor:.6f} \t"
-        f"CrossRate: {crossings_rate:.6f} (Crossings: {count_cross})", file=sys.stderr)
+    print(f"RMS: {rms:.6f} (+/- {std_rms:.6f}) \n "
+          f"maxSqDiff: {max_rms_val:.6f} \t minSqDiff: {min_rms_val:.6f} \n "
+          f"Npoints: {n_drawn}: {n_orig} \n"
+          f"MRT: {mean_tremor:.6f}\t MaxT: {max_tremor:.6f}\t MinT: {min_tremor:.6f}\t StdT: {std_tremor:.6f} \n"
+          f"CrossRate: {crossings_rate:.6f} (Crossings: {count_cross})\n"
+          f"NormDTWdistance: {normalized_dtw:.6f}", file=sys.stderr)
     
     return {
         'RMS': rms,
@@ -263,7 +267,8 @@ def get_features(traced, template):
         'MAX_HT': max_tremor,
         'MIN_HT': min_tremor,
         'STD_HT': std_tremor,
-        'CHANGES_FROM_NEGATIVE_TO_POSITIVE_BETWEEN_ET_HT': count_cross
+        'CHANGES_FROM_NEGATIVE_TO_POSITIVE_BETWEEN_ET_HT': count_cross,
+        'NORMALIZED_DTW_DISTANCE': normalized_dtw
     }
 
 # Zhang-Suen Thinning Algorithm
@@ -546,7 +551,7 @@ def verify(img_: np.ndarray, y: int, x: int) -> bool:
     return cont == 1 # C++ used cont == 2, maybe checking non-skeletonized? Using 1 for skeleton endpoint. Adjust if needed.
 
 # Find the spiral origin
-def find_origen(img_: np.ndarray, oy_guess: int, ox_guess: int) -> Tuple[int, int]:
+def find_origin(img_: np.ndarray, oy_guess: int, ox_guess: int) -> Tuple[int, int]:
     """ Searches near the guess coordinates for a potential origin point. """
     height, width = img_.shape
     search_radius = 100 # Same as C++ code implies
@@ -575,3 +580,19 @@ def find_origen(img_: np.ndarray, oy_guess: int, ox_guess: int) -> Tuple[int, in
         print("Warning: Could not find a suitable origin point near the center using verify(). Using center guess.", file=sys.stderr)
 
     return oy_best, ox_best
+
+# Function to calculate the normalized DTW distance
+def dtw_distance(seq1: List[RadiusAngle], seq2: List[RadiusAngle]) -> float:
+    n, m = len(seq1), len(seq2)
+    dtw = np.full((n + 1, m + 1), np.inf)
+    dtw[0][0] = 0
+
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+            cost = abs(seq1[i - 1].radius - seq2[j - 1].radius)
+            dtw[i][j] = cost + min(dtw[i - 1][j],    # Insertion
+                                   dtw[i][j - 1],    # Deletion
+                                   dtw[i - 1][j - 1]) # Match
+
+    # Normalize the DTW distance
+    return dtw[n][m] / max(n, m) if max(n, m) > 0 else 0

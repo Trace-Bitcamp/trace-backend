@@ -4,7 +4,6 @@ import os
 from supabase import create_client, Client
 import datetime
 from dotenv import load_dotenv
-import base64
 from model.inference import PD_Model
 import numpy as np
 import cv2
@@ -12,6 +11,8 @@ import base64
 from io import BytesIO
 from PIL import Image
 from google import genai
+
+model = PD_Model()
 
 load_dotenv()
 
@@ -221,7 +222,7 @@ def add_treatment():
         app.logger.error(f"error updating patient treatments: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/add_note/', methods=["POST"])
+@app.route('/add_note', methods=["POST"])
 def add_note():
     patient_id = request.args.get("id")
     note = request.args.get("note")
@@ -235,8 +236,15 @@ def add_note():
             
         current_notes = response.data[0].get("notes", [])
         
+        # Create new note object
+        note_obj = {
+            "date": datetime.datetime.now().strftime("%Y-%m-%d"),
+            "note": note,
+            "doctor": "Dr. Johnson"
+        }
+        
         # Add new note to the array
-        updated_notes = current_notes + [note] if current_notes else [note]
+        updated_notes = current_notes + [note_obj] if current_notes else [note_obj]
         
         # Update the patient's notes
         update_response = supabase.table("patients").update({"notes": updated_notes}).eq("id", patient_id).execute()
@@ -265,13 +273,18 @@ def submit_assessment():
         template_image = template_image.replace('data:image/png;base64,', '')
 
     try:
-        pd_prob = model.run_inference(trace_image, template_image, age)[0]
-        print("pd_prob", pd_prob)
+        severity_score, mean_tremor, dtw_distance = model.run_inference(trace_image, template_image, age)
+        print("Severity Score:", severity_score, "Mean Tremor:", mean_tremor, "DTW Distance:", dtw_distance)
     except Exception as e:
         print(str(e))
         return jsonify({"success": False, "error": "Error running model inference:" +  str(e)}), 500
     
-    return jsonify({"success": True, "prob": str(pd_prob)}), 201
+    return jsonify({"success": True, "data": {
+        "severity_score": str(severity_score),
+        "mean_tremor": str(mean_tremor),
+        "dtw_distance": str(dtw_distance)
+        }
+    }), 201
 
 @app.route('/gemini_treatment', methods=["POST"])
 def gemini_treatment():

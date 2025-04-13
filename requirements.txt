@@ -53,3 +53,4 @@ scikit-learn
 opencv-python
 pillow==11.2.1
 google-genai
+matplotlib==3.10.1
