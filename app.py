@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 import os
 from supabase import create_client, Client
@@ -14,7 +14,24 @@ key: str = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
 app = Flask(__name__)
-CORS(app)
+# Configure CORS to allow all origins and methods
+CORS(app, resources={r"/*": {
+    "origins": ["http://localhost:3000", "http://localhost:5173", "*"],  # Add your frontend URL
+    "methods": ["GET", "POST", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization", "Accept"],
+    "expose_headers": ["Content-Range", "X-Content-Range"],
+    "supports_credentials": True
+}})
+
+@app.after_request
+def after_request(response):
+    app.logger.info(f"Response Headers: {dict(response.headers)}")
+    return response
+
+@app.route('/test')
+def test():
+    app.logger.info("Test endpoint hit")
+    return jsonify({"status": "Server is running"}), 200
 
 model = PD_Model()
 
@@ -50,52 +67,95 @@ def get_patient(patient_id):
         app.logger.error(f"error fetching patient data: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/add_patient', methods=["OPTIONS"])
+def handle_options():
+    app.logger.info("OPTIONS request received for /add_patient")
+    response = make_response()
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+    app.logger.info(f"Responding to OPTIONS with headers: {dict(response.headers)}")
+    return response
+
 @app.route('/add_patient', methods=["POST"])
 def add_patient():
-    fName : str = request.args.get("fName")
-    lName : str = request.args.get("lName")
-    birthDate = request.args.get("bDate")
-    gender : str = request.args.get("gender")
-    email : str = request.args.get("email")
-    phoneNum : int = int(request.args.get("phoneNum"))
-    address : str = request.args.get("address")
-    contactName : str = request.args.get("contactName")
-    contactPhone : str = request.args.get("contactPhone")
-    diagnosis = request.args.get("diagnosis")
-    severity : str = request.args.get("severity")
-    medHist : str = request.args.get("medHist")
-    medication : str = request.args.get("medication")
-    assessment_ids = []
-
     try:
+        # Log the incoming request
+        app.logger.info("POST request received for /add_patient")
+        app.logger.info(f"Request headers: {dict(request.headers)}")
+        app.logger.info(f"Request method: {request.method}")
+        app.logger.info(f"Request content type: {request.content_type}")
+        
+        # Get data from request body
+        request_data = request.get_json(silent=True)
+        if not request_data:
+            app.logger.error("No JSON data received in request")
+            app.logger.info(f"Request body: {request.get_data(as_text=True)}")
+            return jsonify({"success": False, "error": "No data provided or invalid JSON"}), 400
+            
+        app.logger.info(f"Received data: {request_data}")
+        
+        # Extract data with validation
+        fName = request_data.get("fName")
+        lName = request_data.get("lName")
+        birthDate = request_data.get("bDate")
+        gender = request_data.get("gender")
+        email = request_data.get("email")
+        phoneNum = request_data.get("phoneNum")
+        address = request_data.get("address")
+        contactName = request_data.get("contactName")
+        contactPhone = request_data.get("contactNum")
+        diagnosis = request_data.get("diagnosis")
+        severity = request_data.get("severity")
+        medHist = request_data.get("medHist")
+        medication = request_data.get("medication")
+        assessment_ids = []
+
+        # Validate required fields
+        required_fields = ["fName", "lName", "bDate"]
+        missing_fields = [field for field in required_fields if not request_data.get(field)]
+        if missing_fields:
+            app.logger.error(f"Missing required fields: {missing_fields}")
+            return jsonify({"success": False, "error": f"Missing required fields: {missing_fields}"}), 400
+
         # Calculate age from birth date
-        birth_date = datetime.datetime.strptime(birthDate, "%Y-%m-%d")
-        today = datetime.datetime.now()
-        age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+        try:
+            birth_date = datetime.datetime.strptime(birthDate, "%Y-%m-%d")
+            today = datetime.datetime.now()
+            age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+        except ValueError as e:
+            app.logger.error(f"Invalid date format: {birthDate}")
+            return jsonify({"success": False, "error": "Invalid date format. Use YYYY-MM-DD"}), 400
 
         data = {
-            "first_name": fName,
-            "last_name": lName,
-            "birth_date": birthDate,
+            "fName": fName,
+            "lName": lName,
+            "birthDate": birthDate,
             "age": age,
             "gender": gender,
             "email": email,
-            "phone_number": phoneNum,
+            "phoneNum": phoneNum,
             "address": address,
-            "emergency_contact_name": contactName,
-            "emergency_contact_phone": contactPhone,
+            "contactName": contactName,
+            "contactPhone": contactPhone,
             "diagnosis": diagnosis,
             "severity": severity,
-            "medical_history": medHist,
+            "medHist": medHist,
             "medication": [medication],
-            "assessment_ids": assessment_ids
+            "assessment_ids": assessment_ids,
+            "notes": []
         }
         
+        app.logger.info("Attempting to insert data into Supabase")
         response = supabase.table("patients").insert(data).execute()
-        return jsonify({"success": True, "data": response.data}), 201
+        app.logger.info("Successfully inserted data")
+        
+        response = jsonify({"success": True, "data": response.data})
+        return response, 201
 
     except Exception as e:
-        app.logger.error(f"error inserting patient data: {str(e)}")
+        app.logger.error(f"Error in add_patient: {str(e)}")
+        app.logger.exception("Full traceback:")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/add_assessment', methods=["POST"])
