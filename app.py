@@ -238,13 +238,8 @@ def add_note():
         return jsonify({"success": False, "error": str(e)}), 500
     
 
-UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
 @app.route('/submit-assessment', methods=["POST"])
 def submit_assessment():
-    print("hi")
     data = request.get_json()
 
     if not data or 'trace' not in data or 'template' not in data or 'age' not in data:
@@ -255,19 +250,19 @@ def submit_assessment():
     age = data['age']
 
     # Remove the prefix (data:image/png;base64,) if it exists
-    for image in [trace_image, template_image]:
-        if image.startswith('data:image/png;base64,'):
-            image = image.replace('data:image/png;base64,', '')
+    if trace_image.startswith('data:image/png;base64,'):
+        trace_image = trace_image.replace('data:image/png;base64,', '')
+    if template_image.startswith('data:image/png;base64,'):
+        template_image = template_image.replace('data:image/png;base64,', '')
 
     try:
-        pd_prob = model.run_inference(trace_image, template_image, age)
+        pd_prob = model.run_inference(trace_image, template_image, age)[0]
         print("pd_prob", pd_prob)
     except Exception as e:
         print(str(e))
         return jsonify({"success": False, "error": "Error running model inference:" +  str(e)}), 500
     
-    print('point C')
-    return jsonify({"success": True, "prob": pd_prob}), 201
+    return jsonify({"success": True, "prob": str(pd_prob)}), 201
 
 
 if __name__ == '__main__':

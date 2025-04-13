@@ -11,18 +11,18 @@ DISPLACEMENT = 10
 # Structures replacement using simple classes
 class CPoint:
     def __init__(self, x: int = 0, y: int = 0):
-        x = x
-        y = y
+        self.x = x
+        self.y = y
 
 class Vertex:
     def __init__(self, x: float = 0.0, y: float = 0.0):
-        x = x
-        y = y
+        self.x = x
+        self.y = y
 
 class RadiusAngle:
     def __init__(self, radius: float = 0.0, angle: float = 0.0):
-        radius = radius
-        angle = angle
+        self.radius = radius
+        self.angle = angle
 
 # Helper functions to get neighbors
 # P9 P2 P3

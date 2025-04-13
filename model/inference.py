@@ -29,9 +29,9 @@ class PD_Model:
 
     def run_inference(self, traced, template, age):
         print("Running inference...")
-        ft_df = pd.DataFrame(get_features(traced, template), index=[0])
 
-        ft_df['AGE'] = age
+        ft_df = pd.DataFrame(get_features(traced, template), index=[0])
+        ft_df.insert(0, 'AGE', age)  # Insert 'AGE' as the first column
 
         return self.model.predict(xgb.DMatrix(ft_df))
 
