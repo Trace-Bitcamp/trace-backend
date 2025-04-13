@@ -29,7 +29,7 @@ def add_patient():
     diagnosis = request.args.get("diagnosis")
     severity : str = request.args.get("severity")
     medHist : str = request.args.get("medHist")
-    medication : str = request.args.get("contactName")
+    medication : str = request.args.get("medication")
     assessment_ids = []
 
     try:
@@ -52,7 +52,7 @@ def add_patient():
             "diagnosis": diagnosis,
             "severity": severity,
             "medical_history": medHist,
-            "medication": medication,
+            "medication": [medication],
             "assessment_ids": assessment_ids
         }
         
@@ -104,6 +104,31 @@ def add_treatment():
     
     except Exception as e:
         app.logger.error(f"error inserting treatment data: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/add_note/', methods=["POST"])
+def add_note():
+    patient_id = request.args.get("id")
+    note = request.args.get("note")
+    
+    try:
+        # Get current notes for the patient
+        response = supabase.table("patients").select("notes").eq("id", patient_id).execute()
+        
+        if not response.data:
+            return jsonify({"success": False, "error": "Patient not found"}), 404
+            
+        current_notes = response.data[0].get("notes", [])
+        
+        # Add new note to the array
+        updated_notes = current_notes + [note] if current_notes else [note]
+        
+        # Update the patient's notes
+        update_response = supabase.table("patients").update({"notes": updated_notes}).eq("id", patient_id).execute()
+        return jsonify({"success": True, "data": update_response.data}), 200
+        
+    except Exception as e:
+        app.logger.error(f"error updating patient notes: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
