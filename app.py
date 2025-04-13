@@ -84,6 +84,27 @@ def add_assessment():
     except Exception as e:
         app.logger.error(f"error inserting assessment data: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
+    
+@app.route('/add_treatment', methods=["POST"])
+def add_treatment():
+    date = request.args.get("date")
+    treatment = request.args.get("treatment")
+    provider = request.args.get("provider")
+
+    try: 
+
+        data = {
+            "date": date,
+            "treatment": treatment,
+            "provider": provider
+        }
+
+        response = supabase.table("treatments").insert(data).execute()
+        return jsonify({"success": True, "data": response.data}), 201
+    
+    except Exception as e:
+        app.logger.error(f"error inserting treatment data: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
