@@ -40,8 +40,12 @@ def P8(dest, r, c): return dest[r, c-1]
 def P9(dest, r, c): return dest[r-1, c-1]
 
 def get_features(traced, template):
-    img_drawn_color = cv2.imdecode(np.frombuffer(base64.b64decode(traced), dtype=np.uint8), cv2.IMREAD_COLOR)
-    img_template_color = cv2.imdecode(np.frombuffer(base64.b64decode(template), dtype=np.uint8), cv2.IMREAD_COLOR)
+    try:
+        img_drawn_color = cv2.imdecode(np.frombuffer(base64.b64decode(traced), dtype=np.uint8), cv2.IMREAD_COLOR)
+        img_template_color = cv2.imdecode(np.frombuffer(base64.b64decode(template), dtype=np.uint8), cv2.IMREAD_COLOR)
+    except Exception as e:
+        print(f"Error decoding images: {e}", file=sys.stderr)
+        return None
 
     # Ensure template image has same dimensions (resize if necessary, or error out)
     # For simplicity, assuming they are the same size as in C++ code
@@ -50,6 +54,7 @@ def get_features(traced, template):
         # Consider resizing template to match drawn, or vice-versa if needed.
         # img_template_color = cv2.resize(img_template_color, (img_drawn_color.shape[1], img_drawn_color.shape[0]))
 
+    print('point 1')
     # Convert to grayscale
     img_drawn_gray = cv2.cvtColor(img_drawn_color, cv2.COLOR_BGR2GRAY)
     img_template_gray = cv2.cvtColor(img_template_color, cv2.COLOR_BGR2GRAY)
@@ -57,6 +62,7 @@ def get_features(traced, template):
     # Threshold (using same values as C++) - Binary Threshold
     _, img_drawn_thresh = cv2.threshold(img_drawn_gray, 220, 255, cv2.THRESH_BINARY)
     _, img_template_thresh = cv2.threshold(img_template_gray, 220, 255, cv2.THRESH_BINARY)
+
 
     # Apply Zhang-Suen Thinning (modifies images in-place)
     print("Thinning drawn image...", file=sys.stderr)
