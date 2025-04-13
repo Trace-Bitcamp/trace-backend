@@ -16,6 +16,9 @@ model = PD_Model()
 
 load_dotenv()
 
+
+port = 10000
+
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
@@ -428,5 +431,6 @@ def gemini_report(patient_id):
 
     return jsonify({"success": True, "response": response.text[12:len(response.text)-4]}), 201
 
+
 if __name__ == '__main__':
-    app.run()
+    app.run(port=port)
