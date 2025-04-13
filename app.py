@@ -18,6 +18,34 @@ CORS(app)
 def hello_world():
     return 'Hello, World!'
 
+@app.route('/patient')
+def get_all_patients():
+    try:
+        response = supabase.table("patients").select("*").execute()
+        
+        if not response.data:
+            return jsonify({"success": False, "error": "Patient not found"}), 404
+            
+        return jsonify({"success": True, "data": response.data[0]}), 200
+        
+    except Exception as e:
+        app.logger.error(f"error fetching patient data: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/patient/<patient_id>')
+def get_patient(patient_id):
+    try:
+        response = supabase.table("patients").select("*").eq("id", patient_id).execute()
+        
+        if not response.data:
+            return jsonify({"success": False, "error": "Patient not found"}), 404
+            
+        return jsonify({"success": True, "data": response.data[0]}), 200
+        
+    except Exception as e:
+        app.logger.error(f"error fetching patient data: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/add_patient', methods=["POST"])
 def add_patient():
     fName : str = request.args.get("fName")
@@ -90,23 +118,34 @@ def add_assessment():
     
 @app.route('/add_treatment', methods=["POST"])
 def add_treatment():
+    patient_id = request.args.get("id")
     date = request.args.get("date")
-    treatment = request.args.get("treatment")
+    t_desc = request.args.get("t_desc")
     provider = request.args.get("provider")
-
-    try: 
-
-        data = {
-            "date": date,
-            "treatment": treatment,
-            "provider": provider
-        }
-
-        response = supabase.table("treatments").insert(data).execute()
-        return jsonify({"success": True, "data": response.data}), 201
+    treatment = {
+        "date": date,
+        "t_desc": t_desc,
+        "provider": provider
+    }
     
+    try:
+        # Get current notes for the patient
+        response = supabase.table("patients").select("notes").eq("id", patient_id).execute()
+        
+        if not response.data:
+            return jsonify({"success": False, "error": "Patient not found"}), 404
+            
+        current_treatments = response.data[0].get("medication", [])
+        
+        # Add new note to the array
+        updated_treatment = current_treatments + [treatment] if current_treatments else [treatment]
+        
+        # Update the patient's treatment
+        update_response = supabase.table("patients").update({"medication": updated_treatment}).eq("id", patient_id).execute()
+        return jsonify({"success": True, "data": update_response.data}), 200
+        
     except Exception as e:
-        app.logger.error(f"error inserting treatment data: {str(e)}")
+        app.logger.error(f"error updating patient notes: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/add_note/', methods=["POST"])
