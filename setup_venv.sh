@@ -9,10 +9,10 @@ fi
 source .venv/bin/activate
 
 # Upgrade pip
-pip3 install --upgrade pip
+pip install --upgrade pip
 
 # Install requirements
-pip3 install -r requirements.txt
+pip install -r requirements.txt
 
 
 echo "Setup complete! Virtual environment is activated."

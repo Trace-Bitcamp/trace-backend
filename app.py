@@ -4,13 +4,14 @@ import os
 from supabase import create_client, Client
 import datetime
 from dotenv import load_dotenv
-import base64
-from model.inference import PD_Model
-import numpy as np
-import cv2
-import base64
-from io import BytesIO
-from PIL import Image
+# from model.inference import PD_Model
+# import numpy as np
+# import cv2
+# import base64
+# from io import BytesIO
+# from PIL import Image
+
+# model = PD_Model()
 
 load_dotenv()
 
@@ -37,8 +38,6 @@ def after_request(response):
 def test():
     app.logger.info("Test endpoint hit")
     return jsonify({"status": "Server is running"}), 200
-
-model = PD_Model()
 
 @app.route('/dashboard')
 def hello_world():
@@ -219,7 +218,7 @@ def add_treatment():
         app.logger.error(f"error updating patient treatments: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/add_note/', methods=["POST"])
+@app.route('/add_note', methods=["POST"])
 def add_note():
     patient_id = request.args.get("id")
     note = request.args.get("note")
@@ -233,8 +232,15 @@ def add_note():
             
         current_notes = response.data[0].get("notes", [])
         
+        # Create new note object
+        note_obj = {
+            "date": datetime.datetime.now().strftime("%Y-%m-%d"),
+            "note": note,
+            "doctor": "Dr. Johnson"
+        }
+        
         # Add new note to the array
-        updated_notes = current_notes + [note] if current_notes else [note]
+        updated_notes = current_notes + [note_obj] if current_notes else [note_obj]
         
         # Update the patient's notes
         update_response = supabase.table("patients").update({"notes": updated_notes}).eq("id", patient_id).execute()
@@ -245,31 +251,31 @@ def add_note():
         return jsonify({"success": False, "error": str(e)}), 500
     
 
-@app.route('/submit-assessment', methods=["POST"])
-def submit_assessment():
-    data = request.get_json()
+# @app.route('/submit-assessment', methods=["POST"])
+# def submit_assessment():
+#     data = request.get_json()
 
-    if not data or 'trace' not in data or 'template' not in data or 'age' not in data:
-        return jsonify({"success": False, "error": "Invalid request"}), 400
+#     if not data or 'trace' not in data or 'template' not in data or 'age' not in data:
+#         return jsonify({"success": False, "error": "Invalid request"}), 400
 
-    trace_image = data['trace']
-    template_image = data['template']
-    age = data['age']
+#     trace_image = data['trace']
+#     template_image = data['template']
+#     age = data['age']
 
-    # Remove the prefix (data:image/png;base64,) if it exists
-    if trace_image.startswith('data:image/png;base64,'):
-        trace_image = trace_image.replace('data:image/png;base64,', '')
-    if template_image.startswith('data:image/png;base64,'):
-        template_image = template_image.replace('data:image/png;base64,', '')
+#     # Remove the prefix (data:image/png;base64,) if it exists
+#     if trace_image.startswith('data:image/png;base64,'):
+#         trace_image = trace_image.replace('data:image/png;base64,', '')
+#     if template_image.startswith('data:image/png;base64,'):
+#         template_image = template_image.replace('data:image/png;base64,', '')
 
-    try:
-        pd_prob = model.run_inference(trace_image, template_image, age)[0]
-        print("pd_prob", pd_prob)
-    except Exception as e:
-        print(str(e))
-        return jsonify({"success": False, "error": "Error running model inference:" +  str(e)}), 500
+#     try:
+#         pd_prob = model.run_inference(trace_image, template_image, age)[0]
+#         print("pd_prob", pd_prob)
+#     except Exception as e:
+#         print(str(e))
+#         return jsonify({"success": False, "error": "Error running model inference:" +  str(e)}), 500
     
-    return jsonify({"success": True, "prob": str(pd_prob)}), 201
+#     return jsonify({"success": True, "prob": str(pd_prob)}), 201
 
 
 if __name__ == '__main__':
