@@ -76,6 +76,20 @@ def get_patient(patient_id):
     except Exception as e:
         app.logger.error(f"error fetching patient data: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
+    
+@app.route('/assessments/<patient_id>')
+def get_assessments(patient_id):
+    try:
+        response = supabase.table("assessments").select("*").eq("patientId", patient_id).execute()
+        
+        if not response.data:
+            return jsonify({"success": False, "error": "No assessments found for this patient"}), 404
+            
+        return jsonify({"success": True, "data": response.data}), 200
+        
+    except Exception as e:
+        app.logger.error(f"error fetching assessment data: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/add_patient', methods=["OPTIONS"])
 def handle_options():
